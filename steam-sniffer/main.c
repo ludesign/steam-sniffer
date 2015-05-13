@@ -14,7 +14,10 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-void processing(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
+/**
+ * Compiling using:
+ * gcc main.c -lpcap -I/usr/include/pcap -o main && sudo ./main
+ */
 
 int main(int argc, const char * argv[]) {
 	fprintf(stdout, "steam-sniffer for dota 2!\n");
@@ -58,16 +61,40 @@ int main(int argc, const char * argv[]) {
 	}
 	
 	fprintf(stdout, "Capturing device: %s\n", device->name);
-	
-	pcap_loop(handle, -1, processing, NULL);
+
+	// captuire individual packets
+	int res = 0;
+	const u_char *packet;
+	struct pcap_pkthdr *header;
+
+	while ((res = pcap_next_ex(handle, &header, &packet)) >= 0) {
+		if (res == 0) {
+			continue;
+		}
+
+		fprintf(stdout, "Captured [%d] of [%d] bytes\n", header->caplen, header->len);
+
+		if (packet[9] == 17) {
+			fprintf(stdout, "UDP Packet\n");
+
+			fprintf(stdout, "version: %x\n", (int) *(packet + 14) >> 4);
+
+			int len = header->caplen;
+			int i = 0;
+			fprintf(stdout, "packet: \n");
+			while (len-- >= 0) {
+				fprintf(stdout, "%02x", (int) *(packet + 14 + i));
+				i++;
+			}
+			fprintf(stdout, "\n\n");
+		}
+	}
+
+	fprintf(stdout, "pcap_next_ex returned error: %s\n", pcap_geterr(handle));
+
+	pcap_close(handle);
 	
 	pcap_freealldevs(devices);
 	
 	return 0;
-}
-
-void processing(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
-	int size = header->len;
-	
-	fprintf(stdout, "Header length: %d\n", size);
 }
